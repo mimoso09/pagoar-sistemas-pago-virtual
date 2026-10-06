@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#060d1c">
+  <title>QR — PAGOAR · Sistemas de Pago Virtual</title>
+  <link rel="icon" href="assets/app-icon.png">
+  <style>
+    :root { --bg: #060d1c; --cyan: #00e1ff; --yellow: #ffc73e; --text: #f2f7ff; --muted: #a9bddb; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { min-height: 100vh; background: radial-gradient(120% 70% at 50% 0%, #133a6b 0%, #0a1a35 45%, var(--bg) 80%) fixed; color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .box { width: min(620px, 100%); text-align: center; }
+    .marca { font-weight: 950; font-size: 22px; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 10px; }
+    .marca img { width: 34px; height: 34px; border-radius: 9px; }
+    .marca b { color: var(--cyan); }
+    h1 { font-size: clamp(26px, 5vw, 44px); line-height: 1.1; margin: 10px 0 6px; }
+    .lead { color: #d8e6f8; font-size: clamp(16px, 2.4vw, 21px); margin: 0 0 18px; }
+    .qr { background: #fff; padding: 22px; border-radius: 26px; display: inline-block; box-shadow: 0 0 0 6px rgba(0,225,255,.35), 0 30px 80px rgba(0,0,0,.5); }
+    #qrcode { width: min(64vh, 78vw, 440px); aspect-ratio: 1; }
+    #qrcode img, #qrcode canvas { width: 100% !important; height: auto !important; display: block; image-rendering: pixelated; }
+    .url { margin: 18px 0 4px; font-size: clamp(14px, 2.2vw, 19px); font-weight: 800; color: var(--cyan); word-break: break-all; }
+    .pasos { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+    .pasos li { background: rgba(16,36,68,.85); border: 1px solid rgba(0,225,255,.25); border-radius: 999px; padding: 8px 12px; font-size: 14px; font-weight: 700; }
+    .pasos b { color: var(--yellow); }
+    .herr { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .herr button, .herr a { border: 1px solid rgba(140,190,255,.3); background: rgba(23,44,78,.85); color: #fff; font: inherit; font-weight: 800; font-size: 14px; padding: 10px 14px; border-radius: 12px; cursor: pointer; text-decoration: none; }
+    details { margin-top: 18px; text-align: left; background: rgba(12,27,53,.8); border: 1px solid rgba(140,190,255,.2); border-radius: 14px; padding: 10px 14px; color: var(--muted); font-size: 14px; }
+    details summary { cursor: pointer; font-weight: 800; color: #d8e6f8; }
+    details input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #36536f; background: #07162b; color: #fff; font: inherit; margin: 10px 0 8px; }
+    details button { width: 100%; padding: 12px; border: 0; border-radius: 10px; background: var(--cyan); color: #04101f; font: inherit; font-weight: 900; cursor: pointer; }
+    body.full .herr, body.full details { display: none; }
+    @media print {
+      body { background: #fff; color: #000; }
+      .herr, details { display: none; }
+      .qr { box-shadow: none; border: 2px solid #000; }
+      .url { color: #000; } .lead { color: #222; } .marca b { color: #007a91; }
+      .pasos li { background: #fff; border-color: #999; color: #000; }
+    }
+  </style>
+</head>
+<body>
+  <main class="box">
+    <div class="marca"><img src="assets/app-icon.png" alt="">PAGO<b>AR</b></div>
+    <h1>Escanea para entrar</h1>
+    <p class="lead">Misión AR · Sistemas de Pago Virtual — sin instalar nada</p>
+
+    <div class="qr"><div id="qrcode" role="img" aria-label="Código QR de la experiencia"></div></div>
+    <p class="url" id="urlTexto"></p>
+
+    <ol class="pasos">
+      <li><b>1</b> Escanea con la cámara</li>
+      <li><b>2</b> Toca «Iniciar experiencia AR»</li>
+      <li><b>3</b> Apunta a la tarjeta AR</li>
+    </ol>
+
+    <div class="herr">
+      <button type="button" id="btnFull">⛶ Pantalla completa</button>
+      <button type="button" id="btnPng">⬇ Descargar PNG</button>
+      <button type="button" onclick="window.print()">🖨 Imprimir</button>
+      <a href="target-card.html">Tarjeta AR</a>
+    </div>
+
+    <details>
+      <summary>Herramienta secundaria: generar QR para otra URL</summary>
+      <input id="url" type="url" inputmode="url" placeholder="https://…" aria-label="URL para el QR">
+      <button type="button" id="go">Generar QR</button>
+    </details>
+  </main>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/vendor/qrcode-1.0.0.min.js"></script>
+  <script>
+    (function () {
+      var DEFECTO = (window.PAGOAR_CONFIG && window.PAGOAR_CONFIG.urlPublica) || new URL('./', location.href).href;
+      var caja = document.getElementById('qrcode');
+      var actual = DEFECTO;
+
+      function generar(url) {
+        actual = url;
+        document.getElementById('urlTexto').textContent = url.replace(/^https?:\/\//, '');
+        caja.textContent = '';
+        if (typeof QRCode === 'undefined') {
+          // Respaldo sin JavaScript de terceros: imagen pregenerada de la URL definitiva.
+          var img = new Image(); img.src = 'assets/qr-pagoar.png'; img.alt = 'QR ' + DEFECTO; caja.appendChild(img);
+          return;
+        }
+        new QRCode(caja, { text: url, width: 1024, height: 1024, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+      }
+
+      // ?url=... permite generar otro QR sin editar archivos
+      var param = new URLSearchParams(location.search).get('url');
+      generar(param && /^https?:\/\//.test(param) ? param : DEFECTO);
+      document.getElementById('url').value = actual;
+
+      document.getElementById('go').addEventListener('click', function () {
+        var u = document.getElementById('url').value.trim();
+        if (!/^https?:\/\//.test(u)) { alert('Escribe una dirección que empiece con https://'); return; }
+        generar(u);
+      });
+      document.getElementById('btnFull').addEventListener('click', function () {
+        document.body.classList.add('full');
+        var el = document.documentElement;
+        var p = el.requestFullscreen ? el.requestFullscreen() : (el.webkitRequestFullscreen && el.webkitRequestFullscreen());
+        if (p && p.catch) p.catch(function () {});
+      });
+      document.addEventListener('fullscreenchange', function () { if (!document.fullscreenElement) document.body.classList.remove('full'); });
+      document.getElementById('btnPng').addEventListener('click', function () {
+        var c = caja.querySelector('canvas'), src = c ? c.toDataURL('image/png') : (caja.querySelector('img') || {}).src;
+        if (!src) return;
+        var a = document.createElement('a'); a.href = src; a.download = 'qr-pagoar.png'; document.body.appendChild(a); a.click(); a.remove();
+      });
+    })();
+  </script>
+</body>
+</html>

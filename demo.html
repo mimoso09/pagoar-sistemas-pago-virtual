@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#060d1c">
+  <meta name="description" content="PAGOAR sin cámara: las 4 etapas sobre sistemas de pago virtual con preguntas y resultado.">
+  <title>PAGOAR — Versión sin AR · Sistemas de Pago Virtual</title>
+  <link rel="icon" href="assets/app-icon.png">
+  <link rel="apple-touch-icon" href="assets/app-icon.png">
+  <link rel="stylesheet" href="assets/css/pagoar.css">
+  <style>
+    body { min-height: 100vh; min-height: 100dvh; background: radial-gradient(120% 60% at 50% 0%, #133a6b 0%, #0a1a35 45%, var(--bg) 80%) fixed; }
+    .topbar { position: sticky; background: linear-gradient(180deg, rgba(6,13,28,.96), rgba(6,13,28,.75)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+    .wrap { width: min(1040px, 100%); margin: 0 auto; padding: 8px 14px calc(26px + var(--safe-bottom)); }
+    .intro { text-align: center; margin: 6px 0 12px; }
+    .tag { display: inline-block; font-size: 12px; font-weight: 900; letter-spacing: 1.2px; text-transform: uppercase; color: #04101f; background: var(--yellow); padding: 4px 10px; border-radius: 999px; }
+    .intro h1 { font-size: 22px; line-height: 1.2; margin: 8px 0 4px; }
+    .intro p { margin: 0; color: var(--muted); font-size: 14.5px; }
+    .grid { display: grid; gap: 14px; align-items: start; }
+    .holo { margin: 0; display: flex; justify-content: center; }
+    .holo canvas { height: min(38vh, 400px); height: min(38dvh, 400px); width: auto; aspect-ratio: 4 / 5; max-width: 100%; filter: drop-shadow(0 18px 40px rgba(0,225,255,.18)); animation: flotar 5s ease-in-out infinite; }
+    .holo canvas.pop { animation: aparecer .45s cubic-bezier(.2,1.3,.4,1) both, flotar 5s ease-in-out .45s infinite; }
+    @keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    @keyframes aparecer { from { transform: scale(.88); opacity: .3; } to { transform: none; opacity: 1; } }
+    .volver { text-align: center; margin: 16px 0 0; font-size: 14.5px; color: var(--muted); }
+    .volver a { font-weight: 800; }
+    @media (min-width: 860px) {
+      .grid { grid-template-columns: 400px 1fr; gap: 26px; margin-top: 10px; }
+      .holo { position: sticky; top: 80px; }
+      .holo canvas { height: auto; width: 100%; }
+      .intro h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" style="color:inherit;text-decoration:none"><img src="assets/app-icon.png" alt="" width="28" height="28">PAGO<b>AR</b></a>
+    <button class="pill" type="button" data-fuentes>Fuentes</button>
+  </header>
+
+  <main class="wrap">
+    <div class="intro">
+      <span class="tag">Versión sin AR</span>
+      <h1>Misión: Sistemas de Pago Virtual</h1>
+      <p>Mismas 4 etapas y preguntas que la experiencia AR, sin usar la cámara.</p>
+    </div>
+
+    <div class="grid">
+      <figure class="holo">
+        <canvas id="holo" width="800" height="1000" role="img" aria-label="Esquema de la etapa actual"></canvas>
+      </figure>
+      <section id="mision" class="mision glass" aria-label="Misión"></section>
+    </div>
+
+    <p class="volver">¿Tu cámara ya funciona? <a href="index.html">Probar la experiencia con AR</a></p>
+  </main>
+
+  <noscript><p style="text-align:center;padding:20px">Esta actividad necesita JavaScript activado.</p></noscript>
+
+  <script src="assets/js/contenido.js"></script>
+  <script src="assets/js/mision.js"></script>
+  <script src="assets/js/holo.js"></script>
+  <script>
+    (function () {
+      var canvas = document.getElementById('holo');
+      var raiz = document.getElementById('mision');
+      var primera = true;
+      var mision = window.PagoarMision.crear({
+        raiz: raiz,
+        onCambio: function (estado) {
+          if (!estado.nuevaVista) return; // solo se respondió: no movemos la vista
+          window.PagoarHolo.dibujar(canvas, estado);
+          canvas.classList.remove('pop'); void canvas.offsetWidth; canvas.classList.add('pop');
+          var etiqueta = estado.fase === 'final'
+            ? 'Misión completada: ' + estado.aciertos + ' de ' + estado.total + ' respuestas correctas'
+            : 'Esquema de la etapa ' + (estado.etapa + 1) + ' de ' + estado.total;
+          canvas.setAttribute('aria-label', etiqueta);
+          // En teléfono, al cambiar de etapa llevamos la vista al inicio del panel.
+          if (!primera && window.matchMedia('(max-width: 859px)').matches) {
+            var y = raiz.getBoundingClientRect().top + window.scrollY - 70;
+            if (window.scrollY > y) window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+          }
+          primera = false;
+        }
+      });
+      mision.render(true);
+      [].forEach.call(document.querySelectorAll('[data-fuentes]'), function (b) { b.addEventListener('click', window.PagoarMision.abrirFuentes); });
+    })();
+  </script>
+</body>
+</html>
