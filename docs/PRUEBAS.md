@@ -85,7 +85,26 @@ compilada en orientación vertical. `payment-target-custom.png` se conserva en e
 
 ## 4. Pruebas en producción (GitHub Pages)
 
-Se completan tras el despliegue (ver sección siguiente del commit).
+Sitio: https://mimoso09.github.io/pagoar-sistemas-pago-virtual/ — desplegado con GitHub Actions
+(workflow «Deploy static site to GitHub Pages», conclusión: success).
+
+| Prueba | Resultado |
+|---|---|
+| `/`, `index.html`, `demo.html`, `target-card.html`, `qr.html` | ✅ HTTP 200, `text/html` |
+| CSS, JS propios, A-Frame, MindAR, qrcodejs (todos en el mismo dominio) | ✅ HTTP 200 |
+| `assets/targets/tarjeta-ar.mind` y `tarjeta-ar.png` | ✅ HTTP 200; SHA-256 idéntico al del repositorio |
+| HTTPS | ✅ `http://` responde 301 → `https://`; la página corre en contexto seguro (`isSecureContext = true`) |
+| Rutas relativas bajo `/pagoar-sistemas-pago-virtual/` | ✅ todos los recursos cargan desde esa ruta |
+| Flujo AR publicado (cámara simulada) | ✅ `arReady` 1.2 s; tarjeta detectada a los 3.4 s |
+| Perder/recuperar la tarjeta en producción | ✅ aviso a los ~0.2 s (el primero ~3.2 s); redetección 0.15–1.2 s; nada se reinicia |
+| Misión completa en producción | ✅ «¡MISIÓN COMPLETADA! Resultado: 3 / 4» (con un error intencional) |
+| Pasar de la AR a `demo.html` en la misma pestaña | ✅ conserva el progreso; recorrido 4/4 y «Volver a empezar» |
+| QR de `qr.html` publicado, decodificado con jsQR | ✅ `https://mimoso09.github.io/pagoar-sistemas-pago-virtual/` (versión 7, nivel H) |
+| QR de respaldo `assets/qr-pagoar.png` publicado | ✅ misma URL |
+| QR del modo proyección de `target-card.html` | ✅ misma URL |
+| `target-card.html?modo=proyeccion` (1024×768) | ✅ proporción mostrada 0.5519 = real 0.5519; cabe completa en pantalla |
+| Desbordamiento horizontal a 375 px y 768 px (4 páginas) | ✅ ninguno |
+| Enlaces de fuentes (Banxico ×3, MindAR) | ✅ HTTP 200 |
 
 ## 5. Limitaciones (no comprobadas)
 
