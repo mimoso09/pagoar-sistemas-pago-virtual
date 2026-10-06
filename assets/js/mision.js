@@ -56,6 +56,22 @@
     } catch (e) { /* no soportado (iPhone) */ }
   }
 
+  var REDUCIDO = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var NS = 'http://www.w3.org/2000/svg';
+  /* Íconos SVG que se "dibujan" (palomita / X / palomita grande del cierre). */
+  function svg(clase, vista, trazos) {
+    var el = document.createElementNS(NS, 'svg');
+    el.setAttribute('viewBox', vista); el.setAttribute('class', clase); el.setAttribute('aria-hidden', 'true');
+    trazos.forEach(function (t) {
+      var n = document.createElementNS(NS, t[0]);
+      Object.keys(t[1]).forEach(function (k) { n.setAttribute(k, t[1][k]); });
+      el.appendChild(n);
+    });
+    return el;
+  }
+  function icoOk() { return svg('m-ico ok', '0 0 24 24', [['path', { d: 'M5 12.5l4.5 4.5L19 7.5', pathLength: '1' }]]); }
+  function icoMal() { return svg('m-ico bad', '0 0 24 24', [['path', { d: 'M7 7l10 10M17 7L7 17', pathLength: '1' }]]); }
+
   /* ---------- Modal de fuentes (compartido) ---------- */
   var modal = null;
   function abrirFuentes() {
@@ -97,11 +113,17 @@
       render(true);
     }
 
+    var recien = null;      // respuesta que se acaba de elegir (solo para animarla una vez)
+    var llenar = -1;        // tramo de la barra de progreso que se acaba de completar
+    var etapaVista = s.etapa, pendiente = null, tCuenta = null;
+
+    /* Progreso: ①──②──③──④ (hecho / actual / pendiente); el tramo recién completado se llena animado. */
     function progreso() {
-      var barra = h('div', { class: 'm-progress', 'aria-hidden': 'true' });
+      var barra = h('div', { class: 'm-progress', role: 'img', 'aria-label': s.fase === 'final' ? 'Misión completada' : 'Etapa ' + (s.etapa + 1) + ' de ' + N });
       for (var i = 0; i < N; i++) {
-        var cls = s.fase === 'final' || i < s.etapa ? 'done' : (i === s.etapa ? 'now' : '');
-        barra.appendChild(h('i', { class: cls }));
+        var hecho = s.fase === 'final' || i < s.etapa;
+        barra.appendChild(h('b', { class: 'm-dot' + (hecho ? ' done' : i === s.etapa ? ' now' : '') + (i === llenar ? ' pop' : ''), text: String(i + 1) }));
+        if (i < N - 1) barra.appendChild(h('i', { class: 'm-link' + (s.fase === 'final' || i < s.etapa ? ' done' : '') + (i === llenar ? ' llenar' : '') }));
       }
       return barra;
     }
@@ -111,8 +133,8 @@
 
     function vistaInfo(e) {
       var puntos = h('ul', { class: 'm-points' });
-      e.puntos.forEach(function (p) { puntos.appendChild(h('li', null, h('b', { text: p[0] + ': ' }), p[1])); });
-      return h('div', { class: 'fade-in' },
+      e.puntos.forEach(function (p, i) { puntos.appendChild(h('li', { style: '--i:' + i }, h('b', { text: p[0] + ': ' }), p[1])); });
+      return h('div', null,
         progreso(), cabecera(e),
         h('h2', { class: 'm-title', text: e.titulo }),
         h('p', { class: 'm-text', text: e.texto }),
@@ -129,7 +151,10 @@
         var cls = 'answer';
         if (respondida && i === e.correcta) cls += ' correct';
         else if (respondida && i === resp) cls += ' wrong';
-        var b = h('button', { class: cls, type: 'button' }, h('span', { class: 'letter', text: LETRAS[i] }), h('span', { text: txt }));
+        if (recien && recien.i === i) cls += recien.ok ? ' pulso-ok' : ' pulso-bad';
+        if (recien) cls += ' recien';
+        var marca = respondida && i === e.correcta ? icoOk() : respondida && i === resp ? icoMal() : document.createTextNode(LETRAS[i]);
+        var b = h('button', { class: cls, type: 'button', style: '--i:' + i }, h('span', { class: 'letter' }, marca), h('span', { text: txt }));
         if (respondida) b.disabled = true;
         b.addEventListener('click', function () { elegir(i); });
         lista.appendChild(b);
@@ -138,12 +163,12 @@
       if (respondida) {
         var ok = resp === e.correcta;
         hijos.push(h('div', { class: 'm-feedback ' + (ok ? 'ok' : 'bad'), role: 'status', 'aria-live': 'polite' },
-          h('strong', { text: ok ? '✅ ¡Correcto!' : '❌ No es la mejor opción' }),
+          h('strong', null, ok ? icoOk() : icoMal(), ok ? '¡Correcto!' : 'No es la mejor opción'),
           (ok ? '' : 'La respuesta correcta es la ' + LETRAS[e.correcta] + '. ') + e.explicacion));
         var ultima = s.etapa === N - 1;
-        hijos.push(h('div', { class: 'm-actions' },
+        hijos.push(h('div', { class: 'm-actions m-tras' },
           h('button', {
-            class: 'btn btn-primary', type: 'button', text: ultima ? 'Ver mi resultado 🏆' : 'Siguiente etapa →',
+            class: 'btn btn-primary', type: 'button', text: ultima ? 'Ver mi resultado →' : 'Siguiente etapa →',
             onclick: function () {
               if (!listo()) return;
               if (ultima) ir({ fase: 'final' }); else ir({ etapa: s.etapa + 1, fase: 'info' });
@@ -153,30 +178,45 @@
         hijos.push(h('div', { class: 'm-actions' },
           h('button', { class: 'btn btn-ghost', type: 'button', text: '← Repasar la información', onclick: function () { if (listo()) ir({ fase: 'info' }); } })));
       }
-      var cont = h('div', { class: 'fade-in' });
+      var cont = h('div');
       hijos.forEach(function (c) { cont.appendChild(c); });
       return cont;
     }
 
+    /* Cierre: 01-04 se encienden, convergen al centro, se dibuja la palomita y aparece el resultado. */
     function vistaFinal() {
       var a = aciertos(s);
       var msg = a === N ? '¡Excelente! Dominaste los cuatro apartados.'
         : a === N - 1 ? '¡Muy bien! Repasa el apartado que falló.'
         : a >= 2 ? 'Buen intento. Revisa las explicaciones y vuelve a intentarlo.'
         : 'Sigue practicando: vuelve a empezar y lee cada explicación.';
+      var orbita = h('div', { class: 'm-orbita', 'aria-hidden': 'true' },
+        h('i', { class: 'm-aro a1' }), h('i', { class: 'm-aro a2' }));
+      for (var i = 0; i < N; i++) orbita.appendChild(h('span', { class: 'm-num n' + i, text: '0' + (i + 1) }));
+      orbita.appendChild(svg('m-sello', '0 0 100 100', [
+        ['path', { d: 'M50 10a40 40 0 1 1 0 80a40 40 0 1 1 0-80', pathLength: '1', class: 'aro' }],
+        ['path', { d: 'M32 51l12 12 24-26', pathLength: '1', class: 'pal' }]]));
+      var cuenta = h('big', { class: 'm-cuenta', text: REDUCIDO ? String(a) : '0' });
       var recap = h('ul', { class: 'm-recap' });
       C.etapas.forEach(function (e, i) {
         var ok = s.respuestas[i] === e.correcta;
-        recap.appendChild(h('li', null, h('span', { class: ok ? 'ok' : 'bad', text: ok ? '✔' : '✘' }), e.clave + ' ' + e.nombre));
+        recap.appendChild(h('li', { style: '--i:' + i }, h('span', { class: ok ? 'ok' : 'bad', text: ok ? '✔' : '✘' }), e.clave + ' ' + e.nombre));
       });
+      clearTimeout(tCuenta);
+      if (!REDUCIDO && a > 0) { // el marcador cuenta de 0 a X
+        var v = 0;
+        var paso = function () { v++; cuenta.textContent = String(v); if (v < a) tCuenta = setTimeout(paso, 170); };
+        tCuenta = setTimeout(paso, 1950);
+      }
       return h('div', { class: 'm-done' },
-        h('div', { class: 'm-trophy', text: '🏆' }),
-        h('div', { class: 'm-done-title', text: '¡MISIÓN COMPLETADA!' }),
-        h('div', { class: 'm-score' }, 'Resultado: ', h('big', { text: a + ' / ' + N }), ' respuestas correctas'),
-        h('p', { text: msg }),
+        progreso(), orbita,
+        h('div', { class: 'm-done-title', text: 'MISIÓN COMPLETADA' }),
+        h('div', { class: 'm-done-sub', text: 'Sistemas de Pago Virtual' }),
+        h('div', { class: 'm-score' }, h('span', { text: 'Resultado' }), h('div', null, cuenta, h('em', { text: ' / ' + N })), h('span', { text: 'respuestas correctas' })),
+        h('p', { class: 'm-msg', text: msg }),
         recap,
-        h('p', { text: C.cierre }),
-        h('div', { class: 'm-actions' },
+        h('p', { class: 'm-cierre', text: C.cierre }),
+        h('div', { class: 'm-actions m-final-acc' },
           h('button', { class: 'btn btn-primary', type: 'button', text: '↻ Volver a empezar', onclick: function () { if (listo()) reiniciar(); } }),
           h('button', { class: 'btn btn-secondary', type: 'button', text: 'Ver fuentes', onclick: abrirFuentes })));
     }
@@ -185,19 +225,42 @@
       if (s.fase !== 'pregunta' || s.respuestas[s.etapa] !== null || !listo()) return;
       s.respuestas[s.etapa] = i;
       guardar(s);
-      vibrar(i === C.etapas[s.etapa].correcta ? 40 : [60, 40, 60]);
+      var ok = i === C.etapas[s.etapa].correcta;
+      vibrar(ok ? 40 : [60, 40, 60]);
+      recien = { i: i, ok: ok };
       render(false);
-      var fb = raiz.querySelector('.m-feedback');
-      if (fb && fb.scrollIntoView) fb.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      recien = null;
+      // la tarjeta del panel "late" en verde o rojo
+      var tarjeta = raiz.closest ? (raiz.closest('.glass') || raiz) : raiz;
+      tarjeta.classList.remove('m-pulso-ok', 'm-pulso-bad'); void tarjeta.offsetWidth;
+      tarjeta.classList.add(ok ? 'm-pulso-ok' : 'm-pulso-bad');
+      setTimeout(function () { tarjeta.classList.remove('m-pulso-ok', 'm-pulso-bad'); }, 700);
+      var fb = raiz.querySelector('.m-tras') || raiz.querySelector('.m-feedback'); // retroalimentación + botón a la vista
+      if (fb && fb.scrollIntoView) setTimeout(function () { fb.scrollIntoView({ block: 'nearest', behavior: REDUCIDO ? 'auto' : 'smooth' }); }, 120);
     }
 
+    /* Transición entre vistas: la actual sale (fundido + desplazamiento) y la nueva entra. */
     function render(arriba) {
       var e = C.etapas[s.etapa];
+      llenar = arriba && s.fase === 'info' && s.etapa > etapaVista ? s.etapa - 1 : -1;
+      etapaVista = s.etapa;
       var vista = s.fase === 'final' ? vistaFinal() : s.fase === 'pregunta' ? vistaPregunta(e) : vistaInfo(e);
-      raiz.textContent = '';
-      raiz.appendChild(vista);
-      if (arriba) raiz.scrollTop = 0;
-      bloqueoHasta = Date.now() + 350;
+      var viejo = raiz.firstElementChild;
+      clearTimeout(pendiente);
+      function montar() {
+        raiz.textContent = '';
+        if (arriba && !REDUCIDO) vista.classList.add('m-entra');
+        raiz.appendChild(vista);
+        if (arriba) raiz.scrollTop = 0;
+      }
+      if (arriba && viejo && !REDUCIDO) {
+        viejo.classList.add('m-sale');
+        pendiente = setTimeout(montar, 170);
+        bloqueoHasta = Date.now() + 560;
+      } else {
+        montar();
+        bloqueoHasta = Date.now() + 350;
+      }
       if (s.fase === 'final' && arriba) vibrar([40, 60, 40, 60, 120]);
       try { onCambio({ etapa: s.etapa, fase: s.fase, aciertos: aciertos(s), total: N, nuevaVista: !!arriba }); } catch (err) { console.warn(err); }
     }

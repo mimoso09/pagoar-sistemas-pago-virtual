@@ -18,17 +18,16 @@
     .intro h1 { font-size: 22px; line-height: 1.2; margin: 8px 0 4px; }
     .intro p { margin: 0; color: var(--muted); font-size: 14.5px; }
     .grid { display: grid; gap: 14px; align-items: start; }
-    .holo { margin: 0; display: flex; justify-content: center; }
-    .holo canvas { height: min(38vh, 400px); height: min(38dvh, 400px); width: auto; aspect-ratio: 4 / 5; max-width: 100%; filter: drop-shadow(0 18px 40px rgba(0,225,255,.18)); animation: flotar 5s ease-in-out infinite; }
-    .holo canvas.pop { animation: aparecer .45s cubic-bezier(.2,1.3,.4,1) both, flotar 5s ease-in-out .45s infinite; }
-    @keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-    @keyframes aparecer { from { transform: scale(.88); opacity: .3; } to { transform: none; opacity: 1; } }
+    /* El holograma animado (mismo motor que la AR) sobre un "proyector" de luz tenue */
+    .holo { position: relative; margin: 0; display: flex; justify-content: center; }
+    .holo::after { content: ''; position: absolute; left: 12%; right: 12%; bottom: -6px; height: 26px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,225,255,.35), transparent); filter: blur(4px); pointer-events: none; }
+    .holo canvas { width: min(100%, 420px); height: auto; aspect-ratio: 4 / 5; display: block; touch-action: pan-y; }
     .volver { text-align: center; margin: 16px 0 0; font-size: 14.5px; color: var(--muted); }
     .volver a { font-weight: 800; }
     @media (min-width: 860px) {
       .grid { grid-template-columns: 400px 1fr; gap: 26px; margin-top: 10px; }
       .holo { position: sticky; top: 80px; }
-      .holo canvas { height: auto; width: 100%; }
+      .holo canvas { width: 100%; }
       .intro h1 { font-size: 28px; }
     }
   </style>
@@ -65,26 +64,33 @@
     (function () {
       var canvas = document.getElementById('holo');
       var raiz = document.getElementById('mision');
-      var primera = true;
+      var holo = window.PagoarHolo.crear();           // misma línea de tiempo que la experiencia AR
+      var ahora = function () { return performance.now() / 1000; };
+      var previo = null;
       var mision = window.PagoarMision.crear({
         raiz: raiz,
         onCambio: function (estado) {
-          if (!estado.nuevaVista) return; // solo se respondió: no movemos la vista
-          window.PagoarHolo.dibujar(canvas, estado);
-          canvas.classList.remove('pop'); void canvas.offsetWidth; canvas.classList.add('pop');
-          var etiqueta = estado.fase === 'final'
-            ? 'Misión completada: ' + estado.aciertos + ' de ' + estado.total + ' respuestas correctas'
-            : 'Esquema de la etapa ' + (estado.etapa + 1) + ' de ' + estado.total;
-          canvas.setAttribute('aria-label', etiqueta);
-          // En teléfono, al cambiar de etapa llevamos la vista al inicio del panel.
-          if (!primera && window.matchMedia('(max-width: 859px)').matches) {
-            var y = raiz.getBoundingClientRect().top + window.scrollY - 70;
-            if (window.scrollY > y) window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+          if (!estado.nuevaVista) { // se respondió: destello verde/rojo del holograma
+            if (previo) holo.destello(estado.aciertos > previo.aciertos ? 'verde' : 'rojo', ahora());
+            previo = estado; holo.setEstado(estado, ahora()); return;
           }
-          primera = false;
+          var cambioEtapa = previo && (previo.etapa !== estado.etapa || (previo.fase === 'final') !== (estado.fase === 'final'));
+          holo.setEstado(estado, ahora());
+          canvas.setAttribute('aria-label', estado.fase === 'final'
+            ? 'Misión completada: ' + estado.aciertos + ' de ' + estado.total + ' respuestas correctas'
+            : 'Esquema animado de la etapa ' + (estado.etapa + 1) + ' de ' + estado.total);
+          // En teléfono: al cambiar de etapa mostramos el nuevo holograma; al pasar a la pregunta, el panel.
+          if (previo && window.matchMedia('(max-width: 859px)').matches) {
+            var destino = cambioEtapa ? canvas : raiz;
+            var y = destino.getBoundingClientRect().top + window.scrollY - 70;
+            if (cambioEtapa || window.scrollY > y) window.scrollTo({ top: Math.max(0, y), behavior: window.PagoarHolo.REDUCIDO ? 'auto' : 'smooth' });
+          }
+          previo = estado;
         }
       });
       mision.render(true);
+      holo.intro(ahora());                             // escaneo → "sistema de pago detectado" → PAGOAR
+      window.PagoarHolo.montar2D(canvas, holo);
       [].forEach.call(document.querySelectorAll('[data-fuentes]'), function (b) { b.addEventListener('click', window.PagoarMision.abrirFuentes); });
     })();
   </script>

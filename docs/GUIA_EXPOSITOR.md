@@ -19,6 +19,13 @@ URL: https://mimoso09.github.io/pagoar-sistemas-pago-virtual/
   tarjeta en pantalla completa.
 - Ten abierta `demo.html` en tu computadora por si quieres mostrar el recorrido a todos.
 
+## Qué verán al apuntar a la tarjeta
+
+La primera vez aparece una breve secuencia (≈2.5 s): escaneo → «SISTEMA DE PAGO DETECTADO» → PAGOAR, y el
+holograma emerge sobre la tarjeta; después se abre el panel de la misión. El panel puede plegarse con
+**«Ocultar»** para ver el holograma completo. Si alguien pierde la tarjeta, el holograma se desvanece y aparece
+«Vuelve a apuntar a la tarjeta»; su progreso no se pierde.
+
 ## Consejos para el público
 
 - Mostrar la **tarjeta completa** en la pantalla del teléfono, a unos **30–60 cm** de una hoja impresa

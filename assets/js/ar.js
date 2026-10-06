@@ -31,10 +31,13 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var h = window.PagoarMision.h;
-  var mision = null, escena = null, ancla = null, holo = null;
-  var iniciando = false, arListo = false, desbloqueado = false, visible = false;
-  var tAyuda = null, tToast = null, tListo = null;
-  var ultimoEstado = null;
+  var mision = null, escena = null, ancla = null;
+  var iniciando = false, arListo = false, desbloqueado = false, visible = false, introHecha = false;
+  var tAyuda = null, tListo = null, tHud = null;
+  // Línea de tiempo de los hologramas (assets/js/holo.js); el rectángulo es el de la tarjeta física.
+  var holo = window.PagoarHolo.crear({ rect: window.PagoarHolo.RECT_TARJETA });
+  var aciertosPrevios = null;
+  function ahora() { return performance.now() / 1000; }
 
   /* ---------------- Carga del motor AR (local primero, CDN de respaldo) ---------------- */
   function cargarScript(url) {
@@ -138,13 +141,8 @@
     });
   }
 
-  function toast(texto, ms) {
-    var t = $('toast');
-    t.textContent = texto; t.hidden = false;
-    t.classList.remove('salir'); void t.offsetWidth; t.classList.add('entrar');
-    clearTimeout(tToast);
-    tToast = setTimeout(function () { t.hidden = true; }, ms || 2600);
-  }
+  /* Aviso "Vuelve a apuntar a la tarjeta" con fundido (no se oculta de golpe). */
+  function avisoFuera(mostrar) { $('fuera').classList.toggle('mostrar', !!mostrar); }
 
   /* ---------------- HUD ---------------- */
   function mostrarHud() {
@@ -159,43 +157,94 @@
     $('hudToggleTexto').textContent = plegar ? 'Mostrar misión' : 'Ocultar';
   }
 
-  /* ---------------- Holograma (componente A-Frame) ---------------- */
+  /* ---------------- Holograma 3D (componente A-Frame) ----------------
+     Dibuja con planos de three.js lo que describe la línea de tiempo de holo.js, a varias profundidades
+     (panel z≈0.02, líneas 0.03, nodos 0.045, partículas 0.06, títulos 0.085): al mover el teléfono
+     se percibe el parallax real. El grupo copia la matriz del ancla de MindAR en cada fotograma, así
+     puede desvanecerse suavemente al perder la tarjeta en lugar de desaparecer de golpe. */
   function registrarComponentes() {
-    if (AFRAME.components['pagoar-holo']) return;
-    AFRAME.registerComponent('pagoar-holo', {
+    if (AFRAME.components['pagoar-holo3d']) return;
+    AFRAME.registerComponent('pagoar-holo3d', {
       init: function () {
-        var THREE = AFRAME.THREE;
-        this.canvas = document.createElement('canvas');
-        this.textura = new THREE.CanvasTexture(this.canvas);
-        if ('colorSpace' in this.textura && THREE.SRGBColorSpace) this.textura.colorSpace = THREE.SRGBColorSpace;
-        else if (THREE.sRGBEncoding) this.textura.encoding = THREE.sRGBEncoding;
-        var geo = new THREE.PlaneGeometry(1.12, 1.4); // proporción 0.8, igual que el diseño 800×1000
-        var mat = new THREE.MeshBasicMaterial({ map: this.textura, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
-        this.el.setObject3D('mesh', new THREE.Mesh(geo, mat));
-        holo = this;
-        if (ultimoEstado) this.pintar(ultimoEstado);
+        var THREE = this.THREE = AFRAME.THREE;
+        this.raiz = new THREE.Group(); this.raiz.matrixAutoUpdate = false; this.raiz.visible = false;
+        this.cont = new THREE.Group(); this.raiz.add(this.cont);
+        this.el.object3D.add(this.raiz);
+        this.geo = new THREE.PlaneGeometry(1, 1);
+        this.mallas = {}; this.tex = {}; this.texUso = {}; this.fade = 0; this.cuadro = 0;
+        this.anclaEl = this.el.querySelector('#ancla');
+        var r = this.el.renderer; this.aniso = r && r.capabilities ? Math.min(4, r.capabilities.getMaxAnisotropy()) : 1;
       },
-      pintar: function (estado) {
-        window.PagoarHolo.dibujar(this.canvas, estado, 1024, 1024); // textura potencia de 2 → mipmaps nítidos
-        this.textura.needsUpdate = true;
+      textura: function (k) {
+        var t = this.tex[k], THREE = this.THREE;
+        this.texUso[k] = this.cuadro;
+        if (!t) {
+          t = this.tex[k] = new THREE.CanvasTexture(window.PagoarHolo.lienzo(k));
+          if ('colorSpace' in t && THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace; else if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+          t.anisotropy = this.aniso;
+        }
+        return t;
       },
-      remove: function () {
-        var m = this.el.getObject3D('mesh');
-        if (m) { m.geometry.dispose(); m.material.dispose(); }
-        this.textura.dispose();
-        this.el.removeObject3D('mesh');
+      tick: function (time, dt) {
+        var anc = this.anclaEl && this.anclaEl.object3D;
+        if (!anc) return;
+        var vis = anc.visible, d = Math.min(dt || 16, 100) / 1000;
+        if (vis) { this.raiz.matrix.copy(anc.matrix); this.raiz.matrixWorldNeedsUpdate = true; }
+        this.fade = Math.max(0, Math.min(1, this.fade + (vis ? d / 0.3 : -d / 0.25)));
+        if (this.fade <= 0) { this.raiz.visible = false; return; }
+        this.raiz.visible = true;
+        var s = 0.9 + 0.1 * (1 - Math.pow(1 - this.fade, 3));
+        this.cont.scale.set(s, s, s);
+        this.reconciliar(holo.frame(ahora()));
+      },
+      reconciliar: function (items) {
+        var U = window.PagoarHolo.UNIDAD, f = this.fade, n = ++this.cuadro, THREE = this.THREE;
+        for (var i = 0; i < items.length; i++) {
+          var it = items[i], m = this.mallas[it.k], mat;
+          if (!m) {
+            mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide, toneMapped: false });
+            if (!it.linea) mat.map = this.textura(it.s);
+            m = new THREE.Mesh(this.geo, mat); m.frustumCulled = false; m.userData.col = '';
+            this.cont.add(m); this.mallas[it.k] = m;
+          }
+          mat = m.material;
+          var col = it.linea ? it.color : (it.tint || '#ffffff');
+          if (m.userData.col !== col) { mat.color.set(col); m.userData.col = col; }
+          if (it.linea) {
+            var dx = it.x2 - it.x1, dy = it.y2 - it.y1;
+            m.position.set(((it.x1 + it.x2) / 2 - 400) * U, (500 - (it.y1 + it.y2) / 2) * U, it.z);
+            m.scale.set(Math.sqrt(dx * dx + dy * dy) * U, it.ancho * U, 1);
+            m.rotation.z = -Math.atan2(dy, dx);
+          } else {
+            var tx = this.textura(it.s);
+            if (mat.map !== tx) { mat.map = tx; mat.needsUpdate = true; }
+            m.position.set((it.x - 400) * U, (500 - it.y) * U, it.z);
+            m.scale.set(it.w * it.sc * U, it.h * it.sc * U, 1);
+            m.rotation.z = -(it.rot || 0);
+          }
+          mat.opacity = it.o * f;
+          m.renderOrder = Math.round(it.z * 20000) * 64 + Math.min(i, 63);
+          m.visible = true; m.userData.n = n;
+        }
+        for (var k in this.mallas) {
+          var mm = this.mallas[k];
+          if (mm.userData.n === n) continue;
+          mm.visible = false;
+          if (n - mm.userData.n > 240) { this.cont.remove(mm); mm.material.dispose(); delete this.mallas[k]; }
+        }
+        // Libera de la GPU las texturas que llevan ~10 s sin usarse (etapas ya superadas).
+        if (n % 120 === 0) for (var kt in this.tex) {
+          if (n - this.texUso[kt] > 600) { this.tex[kt].dispose(); delete this.tex[kt]; delete this.texUso[kt]; }
+        }
       }
     });
   }
 
   function alCambiarMision(estado) {
-    if (!estado.nuevaVista && ultimoEstado) return; // solo se respondió: el holograma no cambia
-    ultimoEstado = estado;
-    if (holo) holo.pintar(estado);
-    var raiz = $('holoRaiz');
-    if (raiz && raiz.emit) raiz.emit('pop');
-    var moneda = $('moneda');
-    if (moneda) moneda.setAttribute('visible', estado.fase !== 'final');
+    // Respuesta (la vista no cambia): destello verde o rojo del holograma.
+    if (!estado.nuevaVista && aciertosPrevios !== null) holo.destello(estado.aciertos > aciertosPrevios ? 'verde' : 'rojo', ahora());
+    aciertosPrevios = estado.aciertos;
+    holo.setEstado(estado, ahora());
   }
 
   /* ---------------- Escena ---------------- */
@@ -204,19 +253,10 @@
     $('arContenedor').innerHTML =
       '<a-scene embedded loading-screen="enabled: false" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false"' +
       ' color-space="sRGB" renderer="colorManagement: true; antialias: true; alpha: true"' +
-      ' mindar-image="imageTargetSrc: ' + TARGET_MIND + '; maxTrack: 1; uiLoading: no; uiScanning: no; uiError: no">' +
+      ' mindar-image="imageTargetSrc: ' + TARGET_MIND + '; maxTrack: 1; uiLoading: no; uiScanning: no; uiError: no" pagoar-holo3d>' +
       '<a-camera position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>' +
-      '<a-entity id="ancla" mindar-image-target="targetIndex: 0">' +
-      '<a-entity id="holoRaiz" position="0 0 0.02" animation__pop="property: scale; from: 0.8 0.8 0.8; to: 1 1 1; dur: 420; easing: easeOutBack; startEvents: pop">' +
-      '<a-entity pagoar-holo></a-entity>' +
-      // Moneda que recorre el flujo: representa el dinero circulando por el sistema
-      '<a-entity id="moneda" position="0.5 0.18 0.06"' +
-      ' animation__ruta="property: position; from: 0.5 0.2 0.06; to: 0.5 -0.44 0.06; dur: 2600; loop: true; easing: easeInOutSine"' +
-      ' animation__giro="property: rotation; from: 0 0 0; to: 0 360 0; dur: 1800; loop: true; easing: linear">' +
-      '<a-cylinder radius="0.045" height="0.012" rotation="90 0 0" color="#ffc73e" material="shader: flat"></a-cylinder>' +
-      '<a-ring radius-inner="0.03" radius-outer="0.037" position="0 0 0.007" color="#b8860b" material="shader: flat; side: double"></a-ring>' +
-      '</a-entity>' +
-      '</a-entity></a-entity></a-scene>';
+      '<a-entity id="ancla" mindar-image-target="targetIndex: 0"></a-entity>' +
+      '</a-scene>';
 
     escena = $('arContenedor').querySelector('a-scene');
     ancla = $('ancla');
@@ -226,7 +266,7 @@
       clearTimeout(tListo);
       $('cargando').hidden = true;
       $('escaneo').hidden = $('visor').hidden = desbloqueado;
-      if (desbloqueado && !visible) $('fuera').hidden = false;
+      if (desbloqueado && !visible) avisoFuera(true);
       vigilarVideo();
       if (!desbloqueado) programarAyuda();
     });
@@ -235,21 +275,35 @@
     });
     ancla.addEventListener('targetFound', function () {
       visible = true;
-      $('fuera').hidden = true;
+      avisoFuera(false);
       clearTimeout(tAyuda);
       $('ayuda').hidden = true;
-      if (!desbloqueado) {
-        desbloqueado = true;
-        $('escaneo').hidden = $('visor').hidden = true;
-        toast('✅ ¡Tarjeta detectada! Misión desbloqueada');
-        window.PagoarMision.vibrar(80);
-        mostrarHud();
+      if (!introHecha) {
+        // Primera detección: escaneo → "sistema de pago detectado" → PAGOAR → interfaz.
+        introHecha = true;
+        holo.intro(ahora());
+        window.PagoarMision.vibrar(60);
+        ocultarEscaneo();
+        if (!desbloqueado) {
+          desbloqueado = true;
+          clearTimeout(tHud);
+          tHud = setTimeout(mostrarHud, Math.max(0, holo.duracionIntro() * 1000 - 250));
+        }
+      } else {
+        holo.reaparecer(ahora()); // continúa donde estaba; solo reinicia el ciclo de la animación
       }
     });
     ancla.addEventListener('targetLost', function () {
       visible = false;
-      // La misión sigue en pantalla: solo avisamos que el holograma no está a la vista.
-      if (desbloqueado) $('fuera').hidden = false;
+      // La misión sigue en pantalla (etapa, respuestas y puntuación intactas); solo avisamos.
+      if (desbloqueado) avisoFuera(true);
+    });
+  }
+
+  function ocultarEscaneo() {
+    ['escaneo', 'visor'].forEach(function (id) {
+      var el = $(id); el.classList.add('saliendo');
+      setTimeout(function () { el.hidden = true; el.classList.remove('saliendo'); }, 320);
     });
   }
 

@@ -25,11 +25,20 @@ window.PAGOAR_CONTENIDO = {
       ],
       correcta: 1,
       explicacion: 'Una app o una tarjeta son solo la parte visible (el instrumento o el canal). Detrás hay procedimientos, reglas e infraestructura que hacen circular el dinero.',
+      // Holograma: un pago recorre la cadena. En amarillo, los tres componentes de la definición de Banxico.
       holo: {
+        tipo: 'flujo',
         titulo: 'DEFINICIÓN Y ESTRUCTURA',
-        conector: '+',
-        nodos: [['INSTRUMENTOS', 'tarjeta · transferencia'], ['PROCEDIMIENTOS', 'reglas de operación'], ['INFRAESTRUCTURA', 'sistemas interbancarios']],
-        pie: 'Juntos aseguran la circulación del dinero'
+        chip: 'MODELO CONCEPTUAL',
+        nodos: [
+          { icono: 'usuario', t: 'USUARIO', s: 'inicia el pago' },
+          { icono: 'comercio', t: 'COMERCIO', s: 'recibe el pago' },
+          { icono: 'tarjeta', t: 'MEDIO DE PAGO', s: 'instrumento', clave: true },
+          { icono: 'banco', t: 'INSTITUCIÓN', s: 'procedimientos y reglas', clave: true },
+          { icono: 'servidores', t: 'INFRAESTRUCTURA', s: 'sistemas interbancarios', clave: true },
+          { icono: 'check', t: 'CONFIRMACIÓN', s: 'el pago se completa' }
+        ],
+        aprobado: 'TRANSACCIÓN APROBADA'
       }
     },
     {
@@ -50,11 +59,36 @@ window.PAGOAR_CONTENIDO = {
       ],
       correcta: 1,
       explicacion: 'No hay un modelo único: una transferencia SPEI® y un pago con tarjeta tienen participantes y reglas distintos. En México, Banco de México regula y supervisa los sistemas de pago y opera algunos, como el SPEI®.',
+      // Holograma: la misma red cambia de operador y participantes según el sistema (SPEI® ↔ tarjetas).
       holo: {
+        tipo: 'red',
         titulo: 'ESTRUCTURAS DE GESTIÓN',
-        conector: '+',
-        nodos: [['OPERADOR', 'administra el sistema'], ['PARTICIPANTES', 'instituciones y usuarios'], ['REGLAS', 'regulación y supervisión']],
-        pie: 'La estructura cambia según el sistema'
+        anillo: 'REGLAS DEL SISTEMA',
+        pie: 'La estructura cambia según el sistema',
+        modelos: [
+          {
+            chip: 'MODELO: SPEI®',
+            centro: { icono: 'banco', t: 'BANCO DE MÉXICO', s: 'opera el SPEI®', oro: true },
+            nodos: [
+              { icono: 'banco', t: 'EMISORA', s: 'institución que envía' },
+              { icono: 'banco', t: 'RECEPTORA', s: 'institución que abona' },
+              { icono: 'banco', t: 'BANCOS', s: 'participantes' },
+              { icono: 'edificio', t: 'IFNB', s: 'no bancarias' }
+            ],
+            rutas: [[0, 1], [2, 3], [3, 0], [1, 2]]
+          },
+          {
+            chip: 'MODELO: PAGO CON TARJETA',
+            centro: { icono: 'red', t: 'CÁMARA DE COMPENSACIÓN', s: 'procesa y compensa' },
+            nodos: [
+              { icono: 'tarjeta', t: 'EMISOR', s: 'emite la tarjeta' },
+              { icono: 'terminal', t: 'ADQUIRENTE', s: 'acepta pagos con tarjeta' },
+              { icono: 'escudo', t: 'TITULAR DE MARCA', s: 'garantiza la liquidación' },
+              { icono: 'capas', t: 'AGREGADOR', s: 'intermedia la aceptación' }
+            ],
+            rutas: [[1, 0], [0, 1], [3, 0], [1, 0]]
+          }
+        ]
       }
     },
     {
@@ -75,10 +109,17 @@ window.PAGOAR_CONTENIDO = {
       ],
       correcta: 0,
       explicacion: 'Un sistema de pago no crea dinero: permite que los fondos pasen de quien paga a quien cobra, con reglas que buscan seguridad y eficiencia.',
+      // Holograma: el dinero circula entre hogares, empresas y gobierno.
       holo: {
+        tipo: 'circulacion',
         titulo: 'FINALIDAD',
-        conector: '+',
-        nodos: [['CIRCULACIÓN', 'el dinero llega a su destino'], ['SEGURIDAD', 'pagos confiables'], ['EFICIENCIA', 'inmediatos y a bajo costo']],
+        centro: 'CIRCULACIÓN DEL DINERO',
+        nodos: [
+          { icono: 'hogar', t: 'HOGARES' },
+          { icono: 'edificio', t: 'EMPRESAS' },
+          { icono: 'gobierno', t: 'GOBIERNO' }
+        ],
+        chips: ['SEGURIDAD', 'EFICIENCIA', 'ESTABILIDAD'],
         pie: 'Mover fondos de forma ordenada y confiable'
       }
     },
@@ -100,11 +141,19 @@ window.PAGOAR_CONTENIDO = {
       ],
       correcta: 1,
       explicacion: 'La orden sale del cliente, su institución la tramita, Banco de México la valida y la envía, y la institución receptora abona los recursos. El SPEI® opera 24/7 y liquida en tiempo real. Otros sistemas, como las tarjetas, siguen pasos distintos.',
+      // Holograma: secuencia de una transferencia SPEI® (ejemplo; otros sistemas siguen pasos distintos).
       holo: {
+        tipo: 'secuencia',
         titulo: 'OPERATIVIDAD · SPEI®',
-        conector: '↓',
-        nodos: [['ORDEN', 'cliente → institución emisora'], ['VALIDACIÓN', 'Banco de México (SPEI®)'], ['ABONO', 'institución receptora · CEP']],
-        pie: 'Liquidación en tiempo real, 24/7'
+        chip: 'EJEMPLO: TRANSFERENCIA SPEI®',
+        nodos: [
+          { icono: 'documento', t: 'INSTRUCCIÓN', s: 'el cliente ordena en su institución', estado: 'ENVIANDO INSTRUCCIÓN…' },
+          { icono: 'banco', t: 'VALIDACIÓN', s: 'Banco de México valida y envía', estado: 'VALIDANDO EN SPEI®…', espera: 1.1 },
+          { icono: 'flechas', t: 'TRANSFERENCIA', s: 'la institución receptora abona', estado: 'ABONANDO LOS RECURSOS…' },
+          { icono: 'check', t: 'CONFIRMACIÓN', s: 'CEP: comprobante del pago' }
+        ],
+        aprobado: 'TRANSFERENCIA ACREDITADA',
+        aprobadoSub: 'CEP DISPONIBLE · 24/7'
       }
     }
   ],

@@ -106,11 +106,35 @@ Sitio: https://mimoso09.github.io/pagoar-sistemas-pago-virtual/ — desplegado c
 | Desbordamiento horizontal a 375 px y 768 px (4 páginas) | ✅ ninguno |
 | Enlaces de fuentes (Banxico ×3, MindAR) | ✅ HTTP 200 |
 
-## 5. Limitaciones (no comprobadas)
+## 5. Segunda pasada: animaciones (2026-10-06)
+
+Verificación hecha en el navegador de pruebas (cámara simulada; ver limitaciones).
+
+| Prueba | Resultado |
+|---|---|
+| Fotogramas exactos de cada escena (intro, 3.1–3.4, cierre) revisados visualmente | ✅ |
+| Intro en AR al primer `targetFound`; el panel de la misión aparece al terminar (≈2.4 s) | ✅ |
+| Capas 3D a distintas profundidades (z 0.020 → 0.086) | ✅ 8 niveles |
+| Respuesta correcta → destello verde del holograma (#4be39a); incorrecta → rojo | ✅ |
+| `targetLost` → desvanecimiento gradual (0.25 s) + «Vuelve a apuntar a la tarjeta»; respuesta y progreso intactos | ✅ |
+| `targetFound` de nuevo → aparece con fundido y continúa en la misma etapa | ✅ |
+| Cierre 3D (sello, marcador) y «Volver a empezar» repite la intro | ✅ |
+| Partículas simultáneas (máx.) | ✅ 27 (objetivo ≤ 30) |
+| Elementos por fotograma (máx.) / cálculo del modelo por fotograma | ✅ 58 / 0.1–0.5 ms (escritorio) |
+| Texturas: liberación automática de la GPU tras ~10 s sin uso | ✅ |
+| `prefers-reduced-motion` (simulado): sin intro, partículas ni movimientos continuos; todo funciona | ✅ |
+| Demo: mismas animaciones, 4 etapas, retroalimentación, cierre y reinicio | ✅ |
+| Textos académicos, preguntas, respuestas correctas y fuentes sin cambios (comparación automática) | ✅ |
+| Sintaxis JS y scripts en línea | ✅ |
+
+## 6. Limitaciones (no comprobadas)
 
 - **Cámara física real** en iPhone/Android: no se pudo probar desde este entorno. Hay que hacer el ensayo del
   apartado «Antes de empezar» de la guía del expositor.
 - Detección con **iluminación, proyector y distancia reales** del salón (solo se simularon).
-- Rendimiento en teléfonos de gama baja (MindAR usa WebGL/TensorFlow.js).
+- Rendimiento en teléfonos de gama baja (MindAR usa WebGL/TensorFlow.js). Las animaciones se diseñaron
+  ligeras (≤ 58 planos, ≤ 27 partículas, sin shaders), pero no se midieron FPS en un teléfono real.
+- Fluidez real de las animaciones: el navegador de pruebas ralentiza animaciones y temporizadores cuando su
+  panel está oculto, así que la cadencia se verificó con fotogramas calculados en tiempos exactos.
 - Navegadores dentro de apps (WhatsApp/Instagram): la app avisa y sugiere abrir en el navegador, pero no se probó.
 - Impresión física: el CSS fija 168 mm de alto para la tarjeta en carta/A4; no se imprimió una hoja real.

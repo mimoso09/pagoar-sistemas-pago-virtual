@@ -42,6 +42,27 @@ QR → index.html → [Iniciar experiencia AR] → permiso de cámara → MindAR
 - **El progreso no se pierde:** si la tarjeta sale de cuadro, el panel sigue visible; si la página se recarga o
   se cambia a la versión sin AR, la misión continúa donde iba (`sessionStorage`).
 
+## Animaciones (lenguaje visual "holograma fintech")
+
+Cada animación explica el contenido de su etapa:
+
+| Momento | Qué se ve |
+|---|---|
+| Primera detección de la tarjeta | Barrido de escaneo, puntos digitales, «ANALIZANDO SISTEMA…», «SISTEMA DE PAGO DETECTADO», logotipo PAGOAR y el panel emerge de la tarjeta (≈2.6 s, solo la primera vez o al reiniciar) |
+| 3.1 Definición y estructura | Un pago recorre USUARIO → COMERCIO → MEDIO DE PAGO → INSTITUCIÓN → INFRAESTRUCTURA → CONFIRMACIÓN; en dorado, los tres componentes de la definición; termina en «TRANSACCIÓN APROBADA» |
+| 3.2 Estructuras de gestión | La misma red cambia entre el modelo SPEI® (Banco de México al centro) y el de pago con tarjeta (cámara de compensación, emisor, adquirente…), con paquetes de datos viajando |
+| 3.3 Finalidad | Monedas circulando entre hogares, empresas y gobierno; se iluminan seguridad, eficiencia y estabilidad |
+| 3.4 Operatividad | Secuencia SPEI®: «ENVIANDO INSTRUCCIÓN…» → «VALIDANDO EN SPEI®…» → «ABONANDO LOS RECURSOS…» → «TRANSFERENCIA ACREDITADA» |
+| Respuestas | Correcta: pulso, palomita que se dibuja y destello verde; incorrecta: pequeño empujón horizontal, X y destello rojo |
+| Cambio de etapa | Salida/entrada con fundido y progreso ①──②──③──④ que se llena |
+| Cierre | 01–04 se encienden, convergen al centro, sello ✓, «MISIÓN COMPLETADA» y marcador X / 4 |
+
+**Técnica:** `assets/js/holo.js` contiene un único modelo de movimiento que usan dos dibujadores: planos de
+A-Frame a distintas profundidades (parallax real sobre la tarjeta) y un canvas 2D para `demo.html`.
+Textos e íconos se pintan una sola vez como texturas; en cada fotograma solo cambian posiciones, escalas y
+opacidades. Máximo 27 partículas simultáneas; sin shaders, modelos 3D ni post-procesado. Con
+`prefers-reduced-motion` se omiten intro, partículas y movimientos continuos.
+
 ## Estructura
 
 ```
@@ -51,7 +72,7 @@ QR → index.html → [Iniciar experiencia AR] → permiso de cámara → MindAR
 /qr.html                QR de la URL publicada, generado automáticamente (corrección de errores H)
 /assets/js/contenido.js Textos académicos, preguntas y fuentes (único lugar para editar contenido)
 /assets/js/mision.js    Motor de la misión (compartido por AR y demo)
-/assets/js/holo.js      Dibujo del holograma de cada etapa (canvas)
+/assets/js/holo.js      Hologramas animados: modelo de movimiento + arte vectorial + dibujador 2D
 /assets/js/ar.js        Arranque de cámara, MindAR/A-Frame y manejo de errores
 /assets/js/config.js    URL pública usada por el QR
 /assets/targets/        tarjeta-ar.png + tarjeta-ar.mind (target compilado de esa misma imagen)
